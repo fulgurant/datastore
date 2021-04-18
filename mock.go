@@ -1,7 +1,7 @@
 package datastore
 
 import (
-	"strings"
+	"bytes"
 	"sync"
 )
 
@@ -24,51 +24,52 @@ func NewMock() *Mock {
 }
 
 // Get retrieves the value stored with the specified key
-func (m *Mock) Get(key interface{}) (value interface{}, err error) {
+func (m *Mock) Get(bucket []byte, key []byte) (value []byte, err error) {
 	if m.GetError != nil {
 		return nil, m.GetError
 	}
-	value, ok := m.Values.Load(key)
+
+	k := append(bucket, key...)
+	v, ok := m.Values.Load(k)
 	if !ok {
 		return nil, ErrNotFound
 	}
-	return value, nil
+	return v.([]byte), nil
 }
 
 // Set sets the specified key to the specified value
-func (m *Mock) Set(key interface{}, value interface{}) error {
+func (m *Mock) Set(bucket []byte, key []byte, value []byte) error {
 	if m.SetError != nil {
 		return m.SetError
 	}
-	m.Values.Store(key, value)
+	k := append(bucket, key...)
+	m.Values.Store(k, value)
 	return nil
 }
 
 // List calls the specified function once per matching pattern
 // Only string patterns are supported
-func (m *Mock) List(pattern interface{}, f ListFunc) error {
+func (m *Mock) List(bucket []byte, pattern []byte, f ListFunc) error {
 	if m.ListError != nil {
 		return m.ListError
-	}
-
-	p, ok := pattern.(string)
-	if !ok {
-		return ErrUnsupportedPattern
 	}
 
 	var err error
 
 	m.Values.Range(func(key interface{}, value interface{}) bool {
-		k, ok := key.(string)
-		if !ok {
+		k := key.([]byte)
+		v := value.([]byte)
+
+		if !bytes.HasPrefix(k, bucket) {
 			return true
 		}
 
-		if !strings.Contains(k, p) {
+		k = k[len(bucket)+1:]
+		if !bytes.Contains(k, pattern) {
 			return true
 		}
 
-		err = f(key, value)
+		err = f(k, v)
 		if err != nil {
 			return false
 		}
