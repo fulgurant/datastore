@@ -30,7 +30,7 @@ func (m *Mock) Get(bucket []byte, key []byte) (value []byte, err error) {
 	}
 
 	k := append(bucket, key...)
-	v, ok := m.Values.Load(k)
+	v, ok := m.Values.Load(string(k))
 	if !ok {
 		return nil, ErrNotFound
 	}
@@ -43,7 +43,7 @@ func (m *Mock) Set(bucket []byte, key []byte, value []byte) error {
 		return m.SetError
 	}
 	k := append(bucket, key...)
-	m.Values.Store(k, value)
+	m.Values.Store(string(k), value)
 	return nil
 }
 
@@ -57,14 +57,14 @@ func (m *Mock) List(bucket []byte, pattern []byte, f ListFunc) error {
 	var err error
 
 	m.Values.Range(func(key interface{}, value interface{}) bool {
-		k := key.([]byte)
+		k := []byte(key.(string))
 		v := value.([]byte)
 
 		if !bytes.HasPrefix(k, bucket) {
 			return true
 		}
 
-		k = k[len(bucket)+1:]
+		k = k[len(bucket):]
 		if !bytes.Contains(k, pattern) {
 			return true
 		}
